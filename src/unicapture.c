@@ -176,16 +176,20 @@ void* unicapture_run(void* data)
             if ((ret = ui_capture->acquire_frame(ui_capture->state, &ui_frame)) != 0) {
                 INFO("ui_capture acquire_frame failed: %d", ret);
                 ui_frame.pixel_format = PIXFMT_INVALID;
+            } else {
+                INFO("Successfully acquired UI frame");
             }
         }
 
-        if (this->video_capture_running) {
-            INFO("Attempting video frame acquisition");
-            if ((ret = video_capture->acquire_frame(video_capture->state, &video_frame)) != 0) {
-                INFO("video_capture acquire_frame failed: %d", ret);
-                video_frame.pixel_format = PIXFMT_INVALID;
-            }
-        }
+        // if (this->video_capture_running && false) {
+        //     INFO("Attempting video frame acquisition");
+        //     if ((ret = video_capture->acquire_frame(video_capture->state, &video_frame)) != 0) {
+        //         INFO("video_capture acquire_frame failed: %d", ret);
+        //         video_frame.pixel_format = PIXFMT_INVALID;
+        //     } else {
+        //         INFO("Successfully acquired video frame");
+        //     }
+        // }
 
         uint64_t frame_acquired = getticks_us();
         // TODO fastpaths handling?
