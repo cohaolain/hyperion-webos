@@ -132,29 +132,37 @@ void* unicapture_run(void* data)
 
         if ((now - last_ui_start) > 1000000 && ui_capture != NULL && !this->ui_capture_running) {
             last_ui_start = now;
-            DBG("Attempting UI capture init...");
+            INFO("Attempting UI capture init...");
             if (ui_capture->start(ui_capture->state) == 0) {
                 INFO("UI capture started");
                 this->ui_capture_running = true;
             }
         }
 
+        INFO("Done attempting UI capture init");
+
         if ((now - last_video_start) > 1000000 && video_capture != NULL && !this->video_capture_running) {
             last_video_start = now;
-            DBG("Attempting video capture init...");
+            INFO("Attempting video capture init...");
             if (video_capture->start(video_capture->state) == 0) {
                 INFO("Video capture started");
                 this->video_capture_running = true;
             }
         }
 
+        INFO("Done attempting video capture init");
+
         int ret = 0;
         uint64_t frame_start = getticks_us();
+
+        INFO("Acquiring vsync lock");
 
         pthread_mutex_lock(&this->vsync_lock);
         pthread_cond_wait(&this->vsync_cond, &this->vsync_lock);
         pthread_mutex_unlock(&this->vsync_lock);
         uint64_t frame_wait = getticks_us();
+
+        INFO("Instantiating frame references");
 
         frame_info_t ui_frame = { PIXFMT_INVALID };
         frame_info_t ui_frame_converted = { PIXFMT_INVALID };
@@ -162,15 +170,19 @@ void* unicapture_run(void* data)
         frame_info_t video_frame_converted = { PIXFMT_INVALID };
 
         // Capture frames
+        INFO("Capture frames!");
         if (this->ui_capture_running) {
+            INFO("Attempting UI frame acquisition");
             if ((ret = ui_capture->acquire_frame(ui_capture->state, &ui_frame)) != 0) {
+                INFO("ui_capture acquire_frame failed: %d", ret);
                 ui_frame.pixel_format = PIXFMT_INVALID;
             }
         }
 
         if (this->video_capture_running) {
+            INFO("Attempting video frame acquisition");
             if ((ret = video_capture->acquire_frame(video_capture->state, &video_frame)) != 0) {
-                DBG("video_capture acquire_frame failed: %d", ret);
+                INFO("video_capture acquire_frame failed: %d", ret);
                 video_frame.pixel_format = PIXFMT_INVALID;
             }
         }
@@ -180,10 +192,12 @@ void* unicapture_run(void* data)
 
         // Convert frame to suitable video formats
         if (ui_frame.pixel_format != PIXFMT_INVALID) {
+            INFO("UI frame seemingly valid!");
             converter_run(&ui_converter, &ui_frame, &ui_frame_converted, PIXFMT_ARGB);
         }
 
         if (video_frame.pixel_format != PIXFMT_INVALID) {
+            INFO("video frame seemingly valid!");
             converter_run(&video_converter, &video_frame, &video_frame_converted, PIXFMT_ARGB);
         }
 
@@ -193,8 +207,11 @@ void* unicapture_run(void* data)
         int width = 0;
         int height = 0;
 
+        INFO("Starting blending!");
+
         // Blend frames and prepare for sending
         if (video_frame_converted.pixel_format != PIXFMT_INVALID && ui_frame_converted.pixel_format != PIXFMT_INVALID) {
+            INFO("Have Video and UI frames, blending...");
             width = video_frame_converted.width;
             height = video_frame_converted.height;
 
@@ -218,6 +235,7 @@ void* unicapture_run(void* data)
                 width,
                 height);
         } else if (ui_frame_converted.pixel_format != PIXFMT_INVALID) {
+            INFO("Only have UI frame");
             width = ui_frame_converted.width;
             height = ui_frame_converted.height;
 
@@ -231,6 +249,7 @@ void* unicapture_run(void* data)
                 width,
                 height);
         } else if (video_frame_converted.pixel_format != PIXFMT_INVALID) {
+            INFO("Only have Video frame");
             width = video_frame_converted.width;
             height = video_frame_converted.height;
 
@@ -266,10 +285,12 @@ void* unicapture_run(void* data)
         uint64_t frame_sent = getticks_us();
 
         if (ui_frame.pixel_format != PIXFMT_INVALID) {
+            INFO("Releasing UI frame");
             ui_capture->release_frame(ui_capture->state, &ui_frame);
         }
 
         if (video_frame.pixel_format != PIXFMT_INVALID) {
+            INFO("Releasing video frame");
             video_capture->release_frame(video_capture->state, &video_frame);
         }
 
